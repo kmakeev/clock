@@ -791,7 +791,7 @@ void loop() {
               NumberArray[3] = NumberArray[4]; //Второй
               NumberArray[4] = NumberArray[5]; //Первый после запятой
               NumberArray[5] = a;  
-                millisAnimation = millisThis;
+              millisAnimation = millisThis;
             }
               
               
@@ -875,6 +875,7 @@ void loop() {
                 a=0;              //переход к первому шагу анимации
                 millisAnimation = millis();                  //фиксируем время начала анимации
             }
+            if (mode==3) isReadTemperature = false;   //Для чтения температуры при ручной смене режима отображения
             // printConsoleTime();
             // Serial.print("Mode change to - ");
             // Serial.println(mode);
