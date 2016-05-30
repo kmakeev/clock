@@ -7,8 +7,12 @@
 
 
 #define NUMITEMS(arg) ((size_t) (sizeof (arg) / sizeof (arg [0])))
-#define ONE_WIRE_BUS 0
-#define TEMPERATURE_PRECISION 8
+#define ONE_WIRE_BUS 0                    
+#define TEMPERATURE_PRECISION 9
+#define DELTA_SHIM_FOR_ANIMATION 4
+#define MAX_SHIM_FOR_ANIMATION 150
+#define DELAY_ANIMATION 7         // чем больше, тем медленее перебираются цифры
+#define DELAY_SHOW 1
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -23,21 +27,21 @@ DeviceAddress insideThermometer;
 // Объявляем переменные и константы
 //Блок общих переменных скетча
 // К155ИД1 (1)
-uint8_t Pin_1_a = 9;                
+uint8_t Pin_1_a = 6;                
 uint8_t Pin_1_b = 8;
 uint8_t Pin_1_c = 7;
-uint8_t Pin_1_d = 6;
+uint8_t Pin_1_d = 5;
 
 // К155ИД1 (2)
 uint8_t Pin_2_a = 13;                
 uint8_t Pin_2_b = 12;
-uint8_t Pin_2_c = 11;
-uint8_t Pin_2_d = 10;
+uint8_t Pin_2_c = 4;
+uint8_t Pin_2_d = 1;
 
 // Анодные пины
-uint8_t Pin_a_1 = 5;//колбы 1, 4
-uint8_t Pin_a_2 = 4;//колбы 2, 5
-uint8_t Pin_a_3 = 1; //колбы 3, 6       //т.к. 1 выход не поддерживает ШИМ
+uint8_t Pin_a_1 = 10;//колбы 1, 4
+uint8_t Pin_a_2 = 11;//колбы 2, 5
+uint8_t Pin_a_3 = 9; //колбы 3, 6       
 
 //Пины для точек
 uint8_t Pin_dot1 = A3;   //Пока будем использовать аналоговые как цифровые
@@ -53,9 +57,9 @@ uint8_t Led_1 = 3;
 //Пин для бипера
 int Buzz_1 = 2;           
 
-
 //Массив для управления анодами ламп
 static const uint8_t anods[3] = {Pin_a_1, Pin_a_2, Pin_a_3};
+
 
 //Массив с помощью которого дешефратору задаются цифры
 static const uint8_t numbers[11][4] = 
@@ -78,6 +82,7 @@ static const uint8_t nixie_level[10] = {
     1, 2, 6, 7, 5, 0, 4, 9, 8, 3
 };
 
+
 static const uint8_t bits[2][4] = 
 { 
     {Pin_1_d, Pin_1_c, Pin_1_b, Pin_1_a},// К155ИД1 (1)
@@ -86,10 +91,12 @@ static const uint8_t bits[2][4] =
 
 //Массив данных для 6 колб
 uint8_t NumberArray[6]={0,0,0,0,0,0};
-
+bool isChangeArray[6]={false, false, false, false, false,false};
+uint8_t ShimAnimationArray[6]={255,255,255,255,255,255};
+uint8_t NumberArrayOLD[6]={0,0,0,0,0,0};
 
 uint8_t mode = 0;
-uint8_t Mins     = 0;
+uint8_t Mins = 0;
 uint8_t Seconds  = 0;
 uint8_t j=0, z=0;
 uint8_t timeset = 0;
@@ -111,11 +118,11 @@ boolean animate = false;
 boolean sec = true;
 tmElements_t tm;
 
-//Блок переменных для работы с кнопкой
+
 unsigned long millisAnimation;               //Время начала шага анимации
 unsigned long millisThis;                    //Время сейчас
 
-
+//Блок переменных для работы с кнопкой
 uint8_t currentButtonStatus = 0;              // 0 - Кнопка не нажата
 // 1 - Кнопка нажата первый раз
 // 2 - Кнопка отжата после двойного нажатия
@@ -542,7 +549,7 @@ void Qb_PLAY(char Muz[])
             if (Nota>11) Nota=11;
             tempLong= freq[oktava][Nota];
             tone(Buzz_1,tempLong,currentNotaDuration);
-            // DisplayNumberString( NumberArray );    //Будем при игре каждой ноты еще показывать время
+            // DisplayNumberString(NumberArray);    //Будем при игре каждой ноты еще показывать последнее содержимое массива колб
             delay(currentNotaPauseDuration);
         }
         if (isPause){
@@ -561,26 +568,59 @@ void setNixieNum(uint8_t tube, uint8_t num) {             //Отображает
         digitalWrite(bits[tube][i], LOW);//боримся против глюков - обнуляем
         if (!animate) digitalWrite(bits[tube][i], numbers[num][i]);
         if (animate)  digitalWrite(bits[tube][i], numbers[nixie_level[j]][i]);
-
     }
 
 }
 
-void DisplayNumberSet(uint8_t anod, uint8_t num1, uint8_t num2 ) {
+void DisplayNumberSet(uint8_t anod, uint8_t num1, uint8_t num2 ) {      //Без ШИМ
     setNixieNum(0, num1);           //Выводим на первый шифратор Num1
     setNixieNum(1, num2);           //Выводим на второй шифратор Num2
-    digitalWrite(anods[anod], HIGH); // Подаем кратковременно сигнал на anod
-    delay(3);
-    digitalWrite(anods[anod], LOW);   //Убираем сигнал
+     digitalWrite(anods[anod], HIGH); // Подаем кратковременно сигнал на anod
+     delay(DELAY_SHOW*2);
+     digitalWrite(anods[anod], LOW);   //Убираем сигнал
 }
+
+
+
+void DisplayNumberSetA(uint8_t anod, uint8_t num1, uint8_t num2 ) {
+    setNixieNum(0, NumberArray[num1]);     //Выводим на первый шифратор  Num1 из массива
+    setNixieNum(1, 10);              //Ничего не выводим на второй шифратор 
+    if (isChangeArray[num1]==true) { //Если нужно анимировать 
+      ShimAnimationArray[num1] = 0;
+      isChangeArray[num1] = false;
+    }
+    analogWrite(anods[anod], ShimAnimationArray[num1]);   // Подаем ШИМ сигнал из массива значений для 6-и колб 
+    delay(DELAY_SHOW);
+    analogWrite(anods[anod], 0);    //Убираем ШИМ мигнал
+ 
+    setNixieNum(0, 10);             //Ничего не выводим на первый шифратор 
+    setNixieNum(1, NumberArray[num2]);    //Выводим на второй шифратор Num2 из массива с анимацией
+    if (isChangeArray[num2]==true) {
+      ShimAnimationArray[num2] = 0;
+      isChangeArray[num2] = false;
+    }
+    analogWrite(anods[anod],ShimAnimationArray[num2]); // Подаем ШИМ сигнал
+    delay(DELAY_SHOW);
+    analogWrite(anods[anod], 0);   //Убираем ШИМ мигнал
+
+    for (uint8_t i=0; i<6; i++){
+      if (ShimAnimationArray[i]<MAX_SHIM_FOR_ANIMATION) ShimAnimationArray[i]=ShimAnimationArray[i] + DELTA_SHIM_FOR_ANIMATION;    //Если ведется анимация, то увеличиваем значение ШИМ сигнала
+      else ShimAnimationArray[i]=255;
+    }
+}
+
 
 void DisplayNumberString( uint8_t* array ) {    //Функция для отображения строки цифр из массива array
 
-    DisplayNumberSet(0,array[0],array[3]);   //Выводим на 1 анод (лампы 1,4) цифры 1,4 из массива
-
-    DisplayNumberSet(1,array[1],array[4]);   //Выводим на 2 анод (лампы 2,5) цифры 2,5 из массива
-
-    DisplayNumberSet(2,array[2],array[5]);   //Выводим на 3 анод (лампы 3,6) цифры 3,6 из массива
+    if (mode == 0) {              //Если показ времени то с анимацией
+      DisplayNumberSetA(0,0,3);   //Выводим на 1 анод (лампы 1,4) цифры 1,4 из массива
+      DisplayNumberSetA(1,1,4);   //Выводим на 2 анод (лампы 2,5) цифры 2,5 из массива  
+      DisplayNumberSetA(2,2,5);   //Выводим на 3 анод (лампы 3,6) цифры 3,6 из массива
+    } else {                      //В других режимах нет
+      DisplayNumberSet(0,array[0],array[3]);   //Выводим на 1 анод (лампы 1,4) цифры 1,4 из массива
+      DisplayNumberSet(1,array[1],array[4]);   //Выводим на 2 анод (лампы 2,5) цифры 2,5 из массива  
+      DisplayNumberSet(2,array[2],array[5]);   //Выводим на 3 анод (лампы 3,6) цифры 3,6 из массива
+    }
 }
 
 void setup() {
@@ -666,17 +706,20 @@ void printConsoleAlarm()
 void playMusic()
 {
     // Serial.println("Play Alarm music");
-    digitalWrite(Led_1, 0);                //Для нормального воспроизведения нужно выключить ШИМ вывод на диоды
+    analogWrite(Led_1, 0);                //Для нормального воспроизведения нужно выключить ШИМ выводы
+    analogWrite(anods[0], 0);
+    analogWrite(anods[1], 0);
+    analogWrite(anods[2], 0);
     Qb_PLAY ("MST255L2O2E.L4F+L2G.L4EGGF+EL2F+L4<BP4L2>F+.L4GL2A.L4F+");
     Qb_PLAY ("AAGF+L1EL2B>EDL4EDCC<BAL2BEP4>CL4<AL2B.L4GF+<B>GF+L1E");
     Qb_PLAY ("L2B>EDL4EDCC<BAL2BEP4>CL4<AL2B.L4GF+<B>GF+L1E");
-    analogWrite(Led_1, dayNight);
+
 }
 
 
 void loop() {
     //Счетчик для анимации
-    if (z==2)
+    if (z==DELAY_ANIMATION)
     {
         j++;
         z=0;
@@ -684,9 +727,10 @@ void loop() {
     if (j==10) {animate=false; j=0; z=0;}
     if (animate) z++;
 
-
+   
     RTC.read(tm);
     Mins = tm.Minute;
+//    if (Seconds != tm.Second) isChangeArray[5] = true;        //Изменилась секунда, задаем признак
     Seconds = tm.Second;
 
     if (isAlarm) {                 //если установлен будильник горят точки
@@ -702,9 +746,9 @@ void loop() {
         digitalWrite(Pin_dot2, LOW);
     }
 
-    if((tm.Hour>=8)&&(tm.Hour<20)) dayNight=150;
-    if((tm.Hour>=20)&&(tm.Hour<22)) dayNight=20;
-    if((tm.Hour>=22)&&(tm.Hour<0)) dayNight=5;
+    if((tm.Hour>=8)&&(tm.Hour<20)) dayNight=255;
+    if((tm.Hour>=20)&&(tm.Hour<22)) dayNight=40;
+    if((tm.Hour>=22)&&(tm.Hour<0)) dayNight=10;
     if((tm.Hour>=0)&&(tm.Hour<8)) dayNight=0;
 
     analogWrite(Led_1, dayNight);        //Яркость свечения диодов определяется временем
@@ -763,16 +807,16 @@ void loop() {
             if (!isReadTemperature)
             {
               sensors.requestTemperatures();
-              tempC = sensors.getTempC(insideThermometer);
+              tempC = sensors.getTempC(insideThermometer) - 6;            // Поправка введена в связи с неточностью работы датчика
               isReadTemperature = true;
               float b = (tempC - int(tempC))*100;
             //Serial.println((int)b/10);
             //Serial.println((int)b%10);
-              NumberArray[0] = 10;        //пусто
-              NumberArray[1] = 10;        //пусто
-              NumberArray[2] = (int)tempC/10; //Первый
-              NumberArray[3] = (int) tempC%10; //Второй
-              NumberArray[4] = (int)b/10; //Первый после запятой
+              NumberArray[0] = (int)tempC/10; //Первый
+              NumberArray[1] = (int) tempC%10; //Второй
+              NumberArray[2] = (int)b/10; //Первый после запятой
+              NumberArray[3] = 10;        //пусто
+              NumberArray[4] = 10;        //пусто
               NumberArray[5] = 10;
               //NumberArray[5] =(int)b%10; //Второй знак после запятой
               
@@ -833,8 +877,8 @@ void loop() {
         // {
         //   sec=true;
         // }
-        //Каждые 59 секунд включаем время
-        if (Seconds==59)
+        //Каждые 58 секунд включаем время
+        if (Seconds==58)
         {
             mode=0;
             animate=true;
@@ -853,7 +897,7 @@ void loop() {
             
         }
         //Включаем температуру на 53 секунду
-        if ((Seconds==53)&(sensorTemperatureIn))
+        if ((Seconds==52)&(sensorTemperatureIn))
         {
             mode=3;
             animate=true;
@@ -930,6 +974,7 @@ void loop() {
             mode = 2;
             timeset = 0;
             alarmclockset = 1;
+            
             //    Serial.println(alarmclockset);
         }else {               //Если мы уже были в процессе установки
             //   Serial.println("Alarm set in ");
@@ -1009,6 +1054,9 @@ void loop() {
         break;
         //Установка минут
     case 2:
+        digitalWrite(Pin_dot1, HIGH);
+        digitalWrite(Pin_dot2, HIGH);
+        mode=0;
         NumberArray[0] = 10;
         NumberArray[1] = 10;
         NumberArray[4] = 10;
@@ -1026,6 +1074,9 @@ void loop() {
         break;
         //Установка секунд
     case 3:
+        digitalWrite(Pin_dot1, HIGH);
+        digitalWrite(Pin_dot2, HIGH);
+        mode=0;
         NumberArray[0] = 10;
         NumberArray[1] = 10;
         NumberArray[2] = 10;
@@ -1044,6 +1095,8 @@ void loop() {
         //Установка дня
     case 4:
         mode=1;
+        digitalWrite(Pin_dot1, HIGH);
+        digitalWrite(Pin_dot2, HIGH);
         NumberArray[2] = 10;
         NumberArray[3] = 10;
         NumberArray[4] = 10;
@@ -1063,6 +1116,8 @@ void loop() {
         // Установка месяца
     case 5:
         mode=1;
+        digitalWrite(Pin_dot1, HIGH);
+        digitalWrite(Pin_dot2, HIGH);
         NumberArray[0] = 10;
         NumberArray[1] = 10;
         NumberArray[4] = 10;
@@ -1082,6 +1137,8 @@ void loop() {
         //Установка года
     case 6:
         mode=1;
+        digitalWrite(Pin_dot1, HIGH);
+        digitalWrite(Pin_dot2, HIGH);
         NumberArray[0] = 10;
         NumberArray[1] = 10;
         NumberArray[2] = 10;
@@ -1097,6 +1154,11 @@ void loop() {
         if (digitalRead(Pin_rt1)&&up) up=false;
         break;
     }
+    for (uint8_t i=0; i<6; i++){
+      if  (NumberArray[i]!=NumberArrayOLD[i]) isChangeArray[i] = true;       //Произошло изменение значения для отображения, нужно его анимировать
+      NumberArrayOLD[i] = NumberArray[i];                                   //Сохраняем текущее значение на следующий цикл как старое
+    }
+    
     DisplayNumberString( NumberArray );
 }
 
