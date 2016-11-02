@@ -7,7 +7,7 @@
 
 
 #define NUMITEMS(arg) ((size_t) (sizeof (arg) / sizeof (arg [0])))
-#define ONE_WIRE_BUS 0                    
+#define ONE_WIRE_BUS A3                    
 #define TEMPERATURE_PRECISION 9
 #define DELTA_SHIM_FOR_ANIMATION 4
 #define MAX_SHIM_FOR_ANIMATION 150
@@ -27,25 +27,24 @@ DeviceAddress insideThermometer;
 // Объявляем переменные и константы
 //Блок общих переменных скетча
 // К155ИД1 (1)
-uint8_t Pin_1_a = 6;                
-uint8_t Pin_1_b = 8;
-uint8_t Pin_1_c = 7;
-uint8_t Pin_1_d = 5;
+//Блок общих переменных скетча
+// К155ИД1 (1)
+uint8_t Pin_2_a = 5;                
+uint8_t Pin_2_b = 6;
+uint8_t Pin_2_c = 7;
+uint8_t Pin_2_d = 8;
 
 // К155ИД1 (2)
-uint8_t Pin_2_a = 13;                
-uint8_t Pin_2_b = 12;
-uint8_t Pin_2_c = 4;
-uint8_t Pin_2_d = 1;
+uint8_t Pin_1_a = 12;                
+uint8_t Pin_1_b = 13;
+uint8_t Pin_1_c = 4;
+uint8_t Pin_1_d = 2;
 
 // Анодные пины
-uint8_t Pin_a_1 = 10;//колбы 1, 4
-uint8_t Pin_a_2 = 11;//колбы 2, 5
-uint8_t Pin_a_3 = 9; //колбы 3, 6       
-
-//Пины для точек
-uint8_t Pin_dot1 = A3;   //Пока будем использовать аналоговые как цифровые
-uint8_t Pin_dot2 = A2;   
+uint8_t Pin_a_3 = 9;//колбы 1, 4
+uint8_t Pin_a_2 = 10;//колбы 2, 5
+uint8_t Pin_a_1 = 11; //колбы 3, 6       
+  
 
 //Пины для кнопок 
 uint8_t Pin_rt1 = A0;   //Пока будем использовать аналоговые как цифровые
@@ -55,7 +54,13 @@ uint8_t Pin_rt2 = A1;
 uint8_t Led_1 = 3; 
 
 //Пин для бипера
-int Buzz_1 = 2;           
+int Buzz_1 = A2;              
+
+//Пины для точек
+uint8_t Pin_dot1 = 0;   //Пока будем использовать аналоговые как цифровые
+uint8_t Pin_dot2 = 1;   
+
+         
 
 //Массив для управления анодами ламп
 static const uint8_t anods[3] = {Pin_a_1, Pin_a_2, Pin_a_3};
@@ -807,7 +812,7 @@ void loop() {
             if (!isReadTemperature)
             {
               sensors.requestTemperatures();
-              tempC = sensors.getTempC(insideThermometer) - 6;            // Поправка введена в связи с неточностью работы датчика
+              tempC = sensors.getTempC(insideThermometer);            // Поправка введена в связи с неточностью работы датчика
               isReadTemperature = true;
               float b = (tempC - int(tempC))*100;
             //Serial.println((int)b/10);
